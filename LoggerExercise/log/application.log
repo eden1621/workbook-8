@@ -1,0 +1,5 @@
+2025-06-09 11:36:02 DEBUG App:26 - This is debug : ☕
+2025-06-09 11:36:02 INFO  App:32 - This is info : ☕
+2025-06-09 11:36:02 WARN  App:36 - This is warn : ☕
+2025-06-09 11:36:02 ERROR App:39 - This is error : ☕
+2025-06-09 11:36:02 FATAL App:42 - This is fatal : ☕
