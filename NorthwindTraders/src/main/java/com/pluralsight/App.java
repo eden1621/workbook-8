@@ -11,6 +11,7 @@ public class App {
         System.out.println("1) Display all product");
         System.out.print("2) Display all customers");
         System.out.print("0) Exit");
+
         System.out.println("Select an option");
         int option = scanner.nextInt();
         scanner.nextLine();
