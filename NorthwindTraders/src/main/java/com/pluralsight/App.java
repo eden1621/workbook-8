@@ -1,131 +1,116 @@
 package com.pluralsight;
+// These are tools we need to get data from the database
+
 import org.apache.commons.dbcp2.BasicDataSource;
-import java.sql.*;
+
 import javax.sql.DataSource;
+import java.sql.*;
 import java.util.Scanner;
 
 public class App {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("What do you want to do");
-        System.out.println("1) Display all product");
-        System.out.print("2) Display all customers");
-        System.out.print("0) Exit");
-        System.out.println("Select an option");
-        int option = scanner.nextInt();
-        scanner.nextLine();
+    // This lets us type things into the computer
 
-        if (args.length !=2) {
+    static Scanner input = new Scanner(System.in);
+    // Make sure we have a username and password before starting
+
+    public static void main(String[] args) {
+
+        if (args.length != 2) {
             System.out.println(
                     "Application needs two arguments to run: " +
                             "java com.pluralsight.UsingDriverManager <username> <password>"
             );
-            System.exit(1);
-        }
-        //get the username and password
-        String userName = args[0];
+            System.exit(1);}// Stop the program if info is missing
+
+        String username = args[0];
         String password = args[1];
+        // Setup the connection to the movie database on our computer
 
-// Declare variables for database connection, statement, and results
-        Connection connection = null;
-        PreparedStatement preparedstatement = null;
-        ResultSet results = null;
-        Scanner scanner1 = new Scanner(System.in); // Scanner for user input
+        BasicDataSource dataSource = new BasicDataSource();
+        dataSource.setUrl("jdbc:mysql://localhost:3306/sakila");
+        dataSource.setUsername(username);
+        dataSource.setPassword(password);
 
-        String query; // SQL query to be executed
-        int choice;  // User's menu choice
+
+
         try {
-            // Display menu options to user
-            System.out.println("What do you want to do?");
-            System.out.println("1) Display all products");
-            System.out.println("2) Display all customers");
-            System.out.println("0) Exit");
-            System.out.println("Enter choice: ");
+            // Let the user search for actors with a certain last name
 
-            choice = scanner.nextInt(); // Read user's choice
+            System.out.println("Enter last name to display matches of actors.");
+            System.out.print("Enter actor's last name: ");
+            String lastName = input.nextLine();
+            // Connect to the database and search for the actor
 
-            // Exit if user chooses 0
-            if (choice == 0) {
-                System.out.println("You chose to exit");
-                return;
-            }
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement stmt = connection.prepareStatement(
+                         "SELECT actor_id, first_name, last_name FROM actor WHERE last_name = ?"
+                 )) {
+                stmt.setString(1, lastName); // Fill in the ? with the user's input
 
-            // Set query based on user's choice
-            if (choice == 1) {
-                // Query to select product details
-                query = "SELECT productId, productName, unitPrice, unitsInStock  FROM products";
-            } else if (choice == 2) {
-                // Query to select customer details, ordered by country
-                query = "SELECT contactName, companyName, city,country, phone FROM customers ORDER BY country";
-            } else{
-                // Invalid choice entered
-                System.out.println("Invalid choice");
-                return; // Exit program for invalid choice
-            }
+                try (ResultSet results = stmt.executeQuery()) {
+                    if (results.next()) {
+                        System.out.println("\nActors with last name '" + lastName + "':");
+                        System.out.println("ID   First Name       Last Name");
+                        System.out.println("-----------------------------------");
+                        do {
+                            // Print each actor's details
 
-            //1. open a connection to the database
-            // use the database URL to point the correct database
-
-            //this is like MySQL workbench and clicking localhost
-
-            // Establish connection to MySQL database 'northwind' running on localhost
-            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/northwind", userName, password);
-            // Prepare the SQL statement
-            preparedstatement = connection.prepareStatement(query);
-            // Execute the query and get results
-            results = preparedstatement.executeQuery();
-
-            // Process results based on user's choice
-            if (choice == 1) {
-                // Loop through product results
-                while (results.next()) {
-
-                    int productId = results.getInt("productId");
-                    String productName = results.getString("ProductName");
-                    double unitPrice = results.getDouble("unitPrice");
-                    int unitInStock = results.getInt("unitsInStock");
-
-                    System.out.println("Product ID: " + productId + ", Name: " + productName + ", Price: $"
-                            + unitPrice + ", Stock: " + unitInStock + "  ------------------");
-
+                            System.out.printf("%-4d %-15s %-15s%n",
+                                    results.getInt("actor_id"),
+                                    results.getString("first_name"),
+                                    results.getString("last_name"));
+                        } while (results.next());
+                    } else {
+                        System.out.println("No actors found with last name '" + lastName + "'.");
+                    }
                 }
-            } else if (choice == 2) {
-                while (results.next()) {
-                    String contactName = results.getString("contactName");
-                    String companyName = results.getString("companyName");
-                    String city = results.getString("city");
-                    String country = results.getString("country");
-                    String phone = results.getString("phone");
+            }
+            System.out.println("-----------------------------------");
 
-                    System.out.println("Contact: " + contactName + ", Company: " + companyName +
-                            ", City: " + city + ", Country: " + country + ", Phone: " + phone + "  ------------------");
+            System.out.println("\nEnter full name to display movies where actor participated.");
+            System.out.print("Enter actor's first name: ");
+            String firstName = input.nextLine();
+            System.out.print("Enter actor's last name: ");
+            String fullLastName = input.nextLine();
 
+            String movieQuery = """
+                SELECT film.title, film.description, film.release_year
+                FROM film
+                JOIN film_actor ON film.film_id = film_actor.film_id
+                JOIN actor ON film_actor.actor_id = actor.actor_id
+                WHERE actor.first_name = ? AND actor.last_name = ?
+                ORDER BY film.title;
+                """;
+
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement stmt = connection.prepareStatement(movieQuery)) {
+                stmt.setString(1, firstName);
+                stmt.setString(2, fullLastName);
+
+                try (ResultSet results = stmt.executeQuery()) {
+                    if (results.next()) {
+                        System.out.println("\nMovies featuring " + firstName + " " + fullLastName + ":");
+                        System.out.println("Title                          Year           Description");
+                        System.out.println("-------------------------------------------------------------");
+                        do {
+                            //show each movie title , year , and what it is about
+
+                            String title = results.getString("title");
+                            String description = results.getString("description");
+                            String year = results.getString("release_year");
+
+                            System.out.printf("%-30s %-5s     %s%n", title, year, description);
+                        } while (results.next());
+                    } else {
+                        System.out.println("No movies found for " + firstName + " " + fullLastName + ".");
+                    }
                 }
+                System.out.println("-------------------------------------------------------------");
+            }
 
-            }
-        } catch (SQLException e){
-            // Handle any SQL exceptions by printing error message
-            System.out.println("Error :" + e.getMessage());
-        }finally{
-            // Close the ResultSet if it was opened
-            try{
-                if (results != null) results.close();
-            }catch (SQLException e){
-                System.out.println("Error closing resultSet: " + e.getMessage());
-            }
-            // Close the PreparedStatement if it was opened
-            try{
-                if (preparedstatement !=null) preparedstatement.close();
-            }catch (SQLException e) {
-                System.out.println("Error closing PreparedStatement: " + e.getMessage());
-            }
-            // Close the Connection if it was opened
-            try{
-                if(connection != null) connection.close();
-            }catch (SQLException e){
-                System.out.println("Error closing Connection: " + e.getMessage());
-            }
-            scanner.close();
+        } catch (SQLException e) {
+            // If something goes wrong, tell us the problem
+            e.printStackTrace();
         }
     }
 }
